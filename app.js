@@ -4,7 +4,7 @@ const ejs = require("ejs");
 const express = require("express");
 const mongoose = require("mongoose");
 const encrypt = require('mongoose-encryption');
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
 
 
 const app = express();
@@ -34,41 +34,50 @@ app.route("/login")
     res.render("login");
   })
   .post(function(req, res) {
-      User.findOne({
-          email: req.body.username
-        }, function(err, docs) {
-          if (!err) {
-            if (docs) {
-              if (docs.password === md5(req.body.password)) {
-                res.render("secrets");
-              } else {
-                res.send("Your email and password did not match. Please try again.");
-              }
+    User.findOne({
+      email: req.body.username
+    }, function(err, docs) {
+      if (!err) {
+        if (docs) {
+          bcrypt.compare(req.body.password, docs.password, function(err, result) {
+            if (result === true) {
+              res.render("secrets");
             } else {
-              res.send("There is no user with that email address in our data.");
+              res.send("Your email and password did not match. Please try again.");
             }
-          } else {
-            res.send(err);
-          }
-        });
-      });
+          });
+
+        } else {
+          res.send("There is no user with that email address in our data.");
+        }
+      } else {
+        res.send(err);
+      }
+    });
+  });
 
 app.route("/register")
   .get(function(req, res) {
     res.render("register");
   })
   .post(function(req, res) {
-    const user = new User({
-      email: req.body.username,
-      password: md5(req.body.password)
+    bcrypt.hash(req.body.password, 10, function(err, hash) {
+
+      const userPassword = hash;
+      const user = new User({
+        email: req.body.username,
+        password: userPassword,
+      });
+      user.save(function(err) {
+        if (err) {
+          console.log(err);
+        } else {
+          res.render("secrets");
+        }
+      });
     });
-    user.save(function(err) {
-      if (err) {
-        console.log(err);
-      } else {
-        res.render("secrets");
-      }
-    });
+
+
 
   });
 app.get("/submit", function(req, res) {
